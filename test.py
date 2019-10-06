@@ -5,9 +5,10 @@ from rdkit import Chem
 from rdkit.Chem import AllChem, Descriptors
 from sklearn.preprocessing import StandardScaler
 from GVAE import Model
+import sys
 
 
-data = 'QM9'
+data = sys.argv[1]
 
 if data=='QM9':
 

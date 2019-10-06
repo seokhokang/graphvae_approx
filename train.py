@@ -2,9 +2,10 @@ import numpy as np
 import pickle as pkl
 from sklearn.preprocessing import StandardScaler
 from GVAE import Model
+import sys
 
 
-data = 'QM9'
+data = sys.argv[1]
 
 if data=='QM9':
 

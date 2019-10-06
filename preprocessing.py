@@ -3,7 +3,10 @@ import pickle as pkl
 import sys, sparse
 from rdkit import Chem
 from rdkit.Chem import AllChem, Descriptors
+import sys
 
+
+data = sys.argv[1]
 
 def to_onehot(val, cat):
 
@@ -32,8 +35,6 @@ def bondFeatures(bonds):
 
     return np.array(e1)
 
-
-data = 'QM9'
 
 if data=='QM9':
 
