@@ -56,18 +56,17 @@ class Model(object):
         self.node_pad = tf.pad(self.node, tf.constant([[0,0],[0,self.n_dummy],[0,0]]), 'CONSTANT')
         self.edge_pad = tf.pad(self.edge, tf.constant([[0,0],[0,self.n_dummy],[0,self.n_dummy],[0,0]]), 'CONSTANT')
 
-        # discriminator
-        self.R_rec = self._encoder(self.batch_size, self.rec_node, self.rec_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 1, name='discriminator/D', reuse=False)
-        self.R_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 1, name='discriminator/D', reuse=True)
-        self.R_real = self._encoder(self.batch_size, self.node_pad, self.edge_pad, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 1, name='discriminator/D', reuse=True)
+        # auxiliary
+        self.R_rec = self._encoder(self.batch_size, self.rec_node, self.rec_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 1, name='auxiliary/R', reuse=False)
+        self.R_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 1, name='auxiliary/R', reuse=True)
+        self.R_real = self._encoder(self.batch_size, self.node_pad, self.edge_pad, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 1, name='auxiliary/R', reuse=True)
         
         self.R_rec_t = tf.placeholder(tf.float32, [self.batch_size, 1])
         self.R_fake_t = tf.placeholder(tf.float32, [self.batch_size, 1])
         
-        self.y_aux_rec = self._encoder(self.batch_size, self.rec_node, self.rec_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, name='discriminator/Y', reuse=False)
-        self.y_aux_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, name='discriminator/Y', reuse=True)
-        self.y_aux_real = self._encoder(self.batch_size, self.node_pad, self.edge_pad, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, name='discriminator/Y', reuse=True)
-        
+        self.y_rec = self._encoder(self.batch_size, self.rec_node, self.rec_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, name='auxiliary/Y', reuse=False)
+        self.y_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, name='auxiliary/Y', reuse=True)
+        self.y_real = self._encoder(self.batch_size, self.node_pad, self.edge_pad, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, name='auxiliary/Y', reuse=True)
 
         # session
         self.saver = tf.train.Saver()
@@ -93,10 +92,6 @@ class Model(object):
             return R_t
 
         ## objective function
-        cost_aux_rec = tf.reduce_mean(tf.reduce_mean(tf.squared_difference(self.property, self.y_aux_rec) * self.R_rec_t, 1))
-        cost_aux_fake = tf.reduce_mean(tf.reduce_mean(tf.squared_difference(self.new_y, self.y_aux_fake) * self.R_fake_t, 1))
-        cost_aux_real = tf.reduce_mean(tf.reduce_mean(tf.squared_difference(self.property, self.y_aux_real), 1))
-
         cost_KLD = tf.reduce_mean(tf.reduce_sum(self._iso_KLD(self.latent_mu, self.latent_lsgms), 1))
         
         cost_rec1 = tf.reduce_mean(tf.reduce_sum(tf.squared_difference(tf.reduce_sum(self.node, 1), tf.reduce_sum(self.rec_node, 1)), 1))
@@ -122,27 +117,34 @@ class Model(object):
         cost_rec3 = cost_rec3 + tf.reduce_mean(tf.reduce_sum(tf.squared_difference(e, er), [1, 2]))
         cost_rec3 = cost_rec3 + tf.reduce_mean(tf.reduce_sum(tf.squared_difference(f, fr), [1, 2]))
  
-        cost_RGf = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_rec), logits=self.R_rec))
+        cost_R_VAE = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_rec), logits=self.R_rec))
+        cost_R_VAE = cost_R_VAE + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_fake), logits=self.R_fake))
+        
+        cost_R_aux = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_real), logits=self.R_real))
+        cost_R_aux = cost_R_aux + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_fake_t, logits=self.R_fake))
+        cost_R_aux = cost_R_aux + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_rec_t, logits=self.R_rec))
+        
+        cost_Y_VAE = tf.reduce_mean(tf.reduce_mean(tf.squared_difference(self.property, self.y_rec) * self.R_rec_t, 1))
+        cost_Y_VAE = cost_Y_VAE + tf.reduce_mean(tf.reduce_mean(tf.squared_difference(self.new_y, self.y_fake) * self.R_fake_t, 1))
+        
+        cost_Y_aux = tf.reduce_mean(tf.reduce_mean(tf.squared_difference(self.property, self.y_real), 1))
 
-        cost_RDf = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_fake), logits=self.R_fake))
-        
-        cost_RDr = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_real), logits=self.R_real))
-        cost_RDr = cost_RDr + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_fake_t, logits=self.R_fake))
-        cost_RDr = cost_RDr + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_rec_t, logits=self.R_rec))
-        
         beta1 = 1
         beta2 = 1
-        self.cost_VAE = cost_KLD + (cost_rec1 + cost_rec2 + cost_rec3) + beta1 * (cost_RGf + cost_RDf) + beta2 * (cost_aux_rec + cost_aux_fake)
-        self.cost_GAN = beta1 * cost_RDr + beta2 * cost_aux_real
+        
+        self.cost_VAE = cost_KLD + (cost_rec1 + cost_rec2 + cost_rec3) + beta1 * cost_R_VAE + beta2 * cost_Y_VAE
+        self.cost_aux = beta1 * cost_R_aux + beta2 * cost_Y_aux
 
         ## variable set
         vars_E = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder')
         vars_G = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
-        vars_D = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator/D')
-        vars_Y = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator/Y')
+        vars_R = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='auxiliary/R')
+        vars_Y = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='auxiliary/Y')
+        
+        assert len(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)) == len(vars_E+vars_G+vars_R+vars_Y)
         
         train_VAE = tf.train.RMSPropOptimizer(learning_rate=self.lr).minimize(self.cost_VAE, var_list=vars_E+vars_G)
-        train_GAN = tf.train.RMSPropOptimizer(learning_rate=self.lr).minimize(self.cost_GAN, var_list=vars_D+vars_Y)  
+        train_aux = tf.train.RMSPropOptimizer(learning_rate=self.lr).minimize(self.cost_aux, var_list=vars_R+vars_Y)  
 
         self.sess.run(tf.initializers.global_variables())
         np.set_printoptions(precision=3, suppress=True)
@@ -152,12 +154,12 @@ class Model(object):
         ## tranining
         max_epoch=50
         print('::: training')
-        trn_log = np.zeros((max_epoch, 10))
+        trn_log = np.zeros((max_epoch, 8))
         for epoch in range(max_epoch):
         
             [DV, DE, DY] = self._permutation([DV, DE, DY])
             
-            trnscores = np.zeros((n_batch, 10))	
+            trnscores = np.zeros((n_batch, 8))	
             for i in range(n_batch):
 
                 start_=i*self.batch_size
@@ -177,7 +179,7 @@ class Model(object):
                                                   self.latent_epsilon: lat1s, self.new_latent: lat2s, self.new_y: lat3s, 
                                                   self.R_fake_t: fake_t, self.R_rec_t: rec_t})
                 
-                trnresult = self.sess.run([train_GAN, cost_aux_rec, cost_aux_fake, cost_aux_real, cost_KLD, cost_rec1, cost_rec2, cost_rec3, cost_RGf, cost_RDf, cost_RDr],
+                trnresult = self.sess.run([train_aux, cost_KLD, cost_rec1, cost_rec2, cost_rec3, cost_R_VAE, cost_R_aux, cost_Y_VAE, cost_Y_aux],
                                      feed_dict = {self.node: DV[start_:end_], self.edge: DE[start_:end_], self.property: DY[start_:end_],
                                                   self.latent_epsilon: lat1s, self.new_latent: lat2s, self.new_y: lat3s, 
                                                   self.R_fake_t: fake_t, self.R_rec_t: rec_t})  
@@ -214,9 +216,9 @@ class Model(object):
 
             if isconditional:
                 latvecsY = np.concatenate([self._random_cond_normal(target_id, target_Y_norm) for _ in range(self.batch_size)], 0)
-                [new_node, new_edge, new_y] = self.sess.run([self.new_node, self.new_edge, self.y_aux_fake], feed_dict = {self.new_y: latvecsY})
+                [new_node, new_edge, new_y] = self.sess.run([self.new_node, self.new_edge, self.y_fake], feed_dict = {self.new_y: latvecsY})
             else:
-                [new_node, new_edge, new_y] = self.sess.run([self.new_node, self.new_edge, self.y_aux_fake], feed_dict = {})
+                [new_node, new_edge, new_y] = self.sess.run([self.new_node, self.new_edge, self.y_fake], feed_dict = {})
             
             for i in range(len(new_node)):
                 total_count+=1
@@ -336,107 +338,102 @@ class Model(object):
         
     
     def _encoder(self, batch_size, node, edge, prop, n_step, hiddendim, aggrdim, latentdim, name='', reuse=True):
+
+        def _embed_node(inp):
         
-        n_node = int(node.shape[1])
+            inp = tf.reshape(inp, [batch_size * n_node, int(inp.shape[2])])
+            inp = tf.layers.dense(inp, hiddendim, activation = tf.nn.tanh)
         
-        with tf.variable_scope(name, reuse=reuse):
+            inp = tf.reshape(inp, [batch_size, n_node, hiddendim])
+            inp = inp * mask
         
-            def _embed_node(inp):
+            return inp
+
+        def _edge_nn(inp):
+        
+            inp = tf.reshape(inp, [batch_size * n_node * n_node, int(inp.shape[3])])
+            inp = tf.layers.dense(inp, hiddendim * hiddendim)
+        
+            inp = tf.reshape(inp, [batch_size, n_node, n_node, hiddendim, hiddendim])
+            inp = inp * tf.reshape(1-tf.eye(n_node), [1, n_node, n_node, 1, 1])
+            inp = inp * tf.reshape(mask, [batch_size, n_node, 1, 1, 1]) * tf.reshape(mask, [batch_size, 1, n_node, 1, 1])
+
+            return inp
+
+        def _MPNN(edge_wgt, node_hidden, n_step):
+        
+            def _msg_nn(wgt, node):
+            
+                wgt = tf.reshape(wgt, [batch_size * n_node, n_node * hiddendim, hiddendim])
+                node = tf.reshape(node, [batch_size * n_node, hiddendim, 1])
+            
+                msg = tf.matmul(wgt, node)
+                msg = tf.reshape(msg, [batch_size, n_node, n_node, hiddendim])
+                msg = tf.transpose(msg, perm = [0, 2, 3, 1])
+                msg = tf.reduce_mean(msg, 3)
+            
+                return msg
+
+            def _update_GRU(msg, node, reuse_GRU):
+            
+                with tf.variable_scope('mpnn_gru', reuse=reuse_GRU):
+            
+                    msg = tf.reshape(msg, [batch_size * n_node, 1, hiddendim])
+                    node = tf.reshape(node, [batch_size * n_node, hiddendim])
+            
+                    cell = tf.nn.rnn_cell.GRUCell(hiddendim)
+                    _, node_next = tf.nn.dynamic_rnn(cell, msg, initial_state = node)
+            
+                    node_next = tf.reshape(node_next, [batch_size, n_node, hiddendim]) * mask
+            
+                return node_next
+
+            nhs=[]
+            for i in range(n_step):
+                message_vec = _msg_nn(edge_wgt, node_hidden)
+                node_hidden = _update_GRU(message_vec, node_hidden, reuse_GRU=(i!=0))
+                nhs.append(node_hidden)
+        
+            out = tf.concat(nhs, axis=2)
+            
+            return out
+
+        def _readout(hidden_0, hidden_n, outdim):    
+            
+            def _attn_nn(inp, hdim):
             
                 inp = tf.reshape(inp, [batch_size * n_node, int(inp.shape[2])])
-                inp = tf.layers.dense(inp, hiddendim, activation = tf.nn.tanh)
-            
-                inp = tf.reshape(inp, [batch_size, n_node, hiddendim])
-                inp = inp * mask
-            
+                inp = tf.layers.dense(inp, hdim, activation = tf.nn.sigmoid)
+                
+                inp = tf.reshape(inp, [batch_size, n_node, hdim])
+                 
                 return inp
-    
-    
-            def _edge_nn(inp):
-            
-                inp = tf.reshape(inp, [batch_size * n_node * n_node, int(inp.shape[3])])
-                inp = tf.layers.dense(inp, hiddendim * hiddendim)
-            
-                inp = tf.reshape(inp, [batch_size, n_node, n_node, hiddendim, hiddendim])
-                inp = inp * tf.reshape(1-tf.eye(n_node), [1, n_node, n_node, 1, 1])
-                inp = inp * tf.reshape(mask, [batch_size, n_node, 1, 1, 1]) * tf.reshape(mask, [batch_size, 1, n_node, 1, 1])
-    
-                return inp
-    
-    
-            def _MPNN(edge_wgt, node_hidden, n_step):
-            
-                def _msg_nn(wgt, node):
-                
-                    wgt = tf.reshape(wgt, [batch_size * n_node, n_node * hiddendim, hiddendim])
-                    node = tf.reshape(node, [batch_size * n_node, hiddendim, 1])
-                
-                    msg = tf.matmul(wgt, node)
-                    msg = tf.reshape(msg, [batch_size, n_node, n_node, hiddendim])
-                    msg = tf.transpose(msg, perm = [0, 2, 3, 1])
-                    msg = tf.reduce_mean(msg, 3)
-                
-                    return msg
-    
-                def _update_GRU(msg, node, reuse_GRU):
-                
-                    with tf.variable_scope('mpnn_gru', reuse=reuse_GRU):
-                
-                        msg = tf.reshape(msg, [batch_size * n_node, 1, hiddendim])
-                        node = tf.reshape(node, [batch_size * n_node, hiddendim])
-                
-                        cell = tf.nn.rnn_cell.GRUCell(hiddendim)
-                        _, node_next = tf.nn.dynamic_rnn(cell, msg, initial_state = node)
-                
-                        node_next = tf.reshape(node_next, [batch_size, n_node, hiddendim]) * mask
-                
-                    return node_next
-    
-                nhs=[]
-                for i in range(n_step):
-                    message_vec = _msg_nn(edge_wgt, node_hidden)
-                    node_hidden = _update_GRU(message_vec, node_hidden, reuse_GRU=(i!=0))
-                    nhs.append(node_hidden)
-            
-                out = tf.concat(nhs, axis=2)
-                
-                return out
-    
-    
-            def _readout(hidden_0, hidden_n, outdim):    
-                
-                def _attn_nn(inp, hdim):
-                
-                    inp = tf.reshape(inp, [batch_size * n_node, int(inp.shape[2])])
-                    inp = tf.layers.dense(inp, hdim, activation = tf.nn.sigmoid)
-                    
-                    inp = tf.reshape(inp, [batch_size, n_node, hdim])
-                     
-                    return inp
-            
-                def _tanh_nn(inp, hdim):
-                
-                    inp = tf.reshape(inp, [batch_size * n_node, int(inp.shape[2])])
-                    inp = tf.layers.dense(inp, hdim)
-                
-                    inp = tf.reshape(inp, [batch_size, n_node, hdim])
-                    
-                    return inp
-    
-                attn_wgt = _attn_nn(tf.concat([hidden_0, hidden_n], 2), aggrdim) 
-                tanh_wgt = _tanh_nn(hidden_n, aggrdim)
-                readout = tf.reduce_mean(tf.multiply(tanh_wgt, attn_wgt) * mask, 1)
-                
-                if prop is not None: readout = tf.concat([readout, prop], 1)
-                
-                readout = tf.nn.tanh(tf.layers.dense(readout, aggrdim))
-                readout = tf.nn.tanh(tf.layers.dense(readout, aggrdim))
-                pred = tf.layers.dense(readout, outdim) 
         
-                return pred
+            def _tanh_nn(inp, hdim):
+            
+                inp = tf.reshape(inp, [batch_size * n_node, int(inp.shape[2])])
+                inp = tf.layers.dense(inp, hdim)
+            
+                inp = tf.reshape(inp, [batch_size, n_node, hdim])
+                
+                return inp
+
+            attn_wgt = _attn_nn(tf.concat([hidden_0, hidden_n], 2), aggrdim) 
+            tanh_wgt = _tanh_nn(hidden_n, aggrdim)
+            readout = tf.reduce_mean(tf.multiply(tanh_wgt, attn_wgt) * mask, 1)
+            
+            if prop is not None: readout = tf.concat([readout, prop], 1)
+            
+            readout = tf.nn.tanh(tf.layers.dense(readout, aggrdim))
+            readout = tf.nn.tanh(tf.layers.dense(readout, aggrdim))
+            pred = tf.layers.dense(readout, outdim) 
     
-    
-            mask = tf.reduce_sum(node[:,:,2+3:], 2, keepdims=True)
+            return pred
+
+        with tf.variable_scope(name, reuse=reuse):
+        
+            n_node = int(node.shape[1])
+            mask = tf.reduce_max(node[:,:,2+3:], 2, keepdims=True)
             
             edge_wgt = _edge_nn(edge)
             hidden_0 = _embed_node(node)
@@ -448,44 +445,44 @@ class Model(object):
     
     
     def _generator(self, batch_size, latent, n_step, name='', reuse=True):
-    
-        with tf.variable_scope(name, reuse=reuse):
-    
-            def _decoder_node(vec):    
+
+        def _decoder_node(vec):    
+        
+            vec = tf.layers.dense(vec, (self.n_node + self.n_dummy) * (self.dim_node + 3) )
+            vec = tf.reshape(vec, [batch_size, self.n_node + self.n_dummy, self.dim_node + 3])
+
+            logit1 = vec[:,:,:3]
+            probs1 = tf.nn.softmax(logit1)[:,:,:-1]
+
+            logit2 = vec[:,:,3:3+4]
+            probs2 = tf.nn.softmax(logit2)[:,:,:-1]
+
+            logit3 = vec[:,:,3+4:]
+            probs3 = tf.nn.softmax(logit3)[:,:,:-1]
+
+            probout = tf.concat([probs1, probs2, probs3], 2)
             
-                vec = tf.layers.dense(vec, (self.n_node + self.n_dummy) * (self.dim_node + 3) )
-                vec = tf.reshape(vec, [batch_size, self.n_node + self.n_dummy, self.dim_node + 3])
-    
-                logit1 = vec[:,:,:3]
-                probs1 = tf.nn.softmax(logit1)[:,:,:-1]
+            return probout
 
-                logit2 = vec[:,:,3:3+4]
-                probs2 = tf.nn.softmax(logit2)[:,:,:-1]
+        def _decoder_edge(vec):    
 
-                logit3 = vec[:,:,3+4:]
-                probs3 = tf.nn.softmax(logit3)[:,:,:-1]
+            vec = tf.layers.dense(vec, (self.n_node + self.n_dummy) * (self.n_node + self.n_dummy) * (self.dim_edge+1))
+            vec = tf.reshape(vec, [batch_size, self.n_node + self.n_dummy, self.n_node + self.n_dummy, self.dim_edge+1])
+            
+            logit = (vec + tf.transpose(vec, perm = [0, 2, 1, 3])) / 2
+            
+            probs = tf.nn.softmax(logit)[:,:,:,:-1] * tf.reshape(1-tf.eye(self.n_node + self.n_dummy), [1, self.n_node + self.n_dummy, self.n_node + self.n_dummy, 1])
+              
+            return probs
 
-                probout = tf.concat([probs1, probs2, probs3], 2)
-                
-                return probout
-    
-            def _decoder_edge(vec):    
-    
-                vec = tf.layers.dense(vec, (self.n_node + self.n_dummy) * (self.n_node + self.n_dummy) * (self.dim_edge+1))
-                vec = tf.reshape(vec, [batch_size, self.n_node + self.n_dummy, self.n_node + self.n_dummy, self.dim_edge+1])
-                
-                logit = (vec + tf.transpose(vec, perm = [0, 2, 1, 3])) / 2
-                
-                probs = tf.nn.softmax(logit)[:,:,:,:-1] * tf.reshape(1-tf.eye(self.n_node + self.n_dummy), [1, self.n_node + self.n_dummy, self.n_node + self.n_dummy, 1])
-                  
-                return probs
-    
+        with tf.variable_scope(name, reuse=reuse):
+        
             for _ in range(n_step):
                 latent = tf.nn.leaky_relu(tf.layers.batch_normalization(tf.layers.dense(latent, self.dim_f)))
             
             rec_node_prob = _decoder_node(latent)
             rec_edge_prob = _decoder_edge(latent)
-    
+
         return rec_node_prob, rec_edge_prob
 
         

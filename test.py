@@ -32,7 +32,7 @@ elif data=='ZINC':
 n_node = n_max
 
 data_path = './'+data+'_graph.pkl'
-save_dict = './'
+save_path = './'+data+'_model.ckpt'
 
 print(':: load data')
 with open(data_path,'rb') as f:
@@ -56,7 +56,7 @@ model = Model(n_node, dim_node, dim_edge, dim_y, mu_prior, cov_prior)
 np.set_printoptions(precision=3, suppress=True)
 
 with model.sess:
-    model.saver.restore(model.sess, save_dict+data+'_model.ckpt')     
+    model.saver.restore(model.sess, save_path)     
 
     # unconditional generation     
     total_count, valid_count, novel_count, unique_count, genmols = model.test(10000, 0, Dsmi, atom_list)
