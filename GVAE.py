@@ -61,9 +61,9 @@ class Model(object):
         self.R_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 1, name='auxiliary/R', reuse=True)
         self.R_real = self._encoder(self.batch_size, self.node_pad, self.edge_pad, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 1, name='auxiliary/R', reuse=True)
         
-        self.R_real_t = tf.placeholder(tf.float32, [self.batch_size, 1])
         self.R_rec_t = tf.placeholder(tf.float32, [self.batch_size, 1])
         self.R_fake_t = tf.placeholder(tf.float32, [self.batch_size, 1])
+        self.R_real_t = tf.placeholder(tf.float32, [self.batch_size, 1])
         
         self.y_rec = self._encoder(self.batch_size, self.rec_node, self.rec_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, name='auxiliary/Y', reuse=False)
         self.y_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, name='auxiliary/Y', reuse=True)
@@ -176,9 +176,9 @@ class Model(object):
                                                                                                    self.latent_epsilon, self.new_latent, self.new_y],
                                      feed_dict = {self.node: DV[start_:end_], self.edge: DE[start_:end_], self.property: DY[start_:end_]})
 
-                real_t = _reward(DV[start_:end_], DE[start_:end_])
                 fake_t = _reward(new_nodes, new_edges)
                 rec_t = _reward(rec_nodes, rec_edges)
+                real_t = _reward(DV[start_:end_], DE[start_:end_])
                                                   
                 self.sess.run(train_VAE,
                                      feed_dict = {self.node: DV[start_:end_], self.edge: DE[start_:end_], self.property: DY[start_:end_],
