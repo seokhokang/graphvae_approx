@@ -77,7 +77,7 @@ class Model(object):
             self.sess = tf.Session(config=config)
 
 
-    def train(self, DV, DE, DY, Dsmi, atom_list, save_path=None):
+    def train(self, DV, DE, DY, Dsmi, atom_list, load_path=None, save_path=None):
 
         def _reward(nodes, edges):
         
@@ -150,9 +150,12 @@ class Model(object):
         np.set_printoptions(precision=3, suppress=True)
 
         n_batch = int(len(DV)/self.batch_size)
+        
+        if load_path is not None:
+            self.saver.restore(self.sess, load_path)
 
         ## tranining
-        max_epoch=50
+        max_epoch=100
         print('::: training')
         trn_log = np.zeros((max_epoch, 8))
         for epoch in range(max_epoch):
