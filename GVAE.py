@@ -61,6 +61,7 @@ class Model(object):
         self.R_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 1, name='auxiliary/R', reuse=True)
         self.R_real = self._encoder(self.batch_size, self.node_pad, self.edge_pad, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 1, name='auxiliary/R', reuse=True)
         
+        self.R_real_t = tf.placeholder(tf.float32, [self.batch_size, 1])
         self.R_rec_t = tf.placeholder(tf.float32, [self.batch_size, 1])
         self.R_fake_t = tf.placeholder(tf.float32, [self.batch_size, 1])
         
@@ -120,7 +121,7 @@ class Model(object):
         cost_R_VAE = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_rec), logits=self.R_rec))
         cost_R_VAE = cost_R_VAE + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_fake), logits=self.R_fake))
         
-        cost_R_aux = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_real), logits=self.R_real))
+        cost_R_aux = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_real_t, logits=self.R_real))
         cost_R_aux = cost_R_aux + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_fake_t, logits=self.R_fake))
         cost_R_aux = cost_R_aux + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_rec_t, logits=self.R_rec))
         
@@ -158,6 +159,7 @@ class Model(object):
         max_epoch=100
         print('::: training')
         trn_log = np.zeros((max_epoch, 8))
+        eval_log = np.zeros(max_epoch)
         for epoch in range(max_epoch):
         
             [DV, DE, DY] = self._permutation([DV, DE, DY])
@@ -174,18 +176,19 @@ class Model(object):
                                                                                                    self.latent_epsilon, self.new_latent, self.new_y],
                                      feed_dict = {self.node: DV[start_:end_], self.edge: DE[start_:end_], self.property: DY[start_:end_]})
 
+                real_t = _reward(DV[start_:end_], DE[start_:end_])
                 fake_t = _reward(new_nodes, new_edges)
                 rec_t = _reward(rec_nodes, rec_edges)
                                                   
                 self.sess.run(train_VAE,
                                      feed_dict = {self.node: DV[start_:end_], self.edge: DE[start_:end_], self.property: DY[start_:end_],
                                                   self.latent_epsilon: lat1s, self.new_latent: lat2s, self.new_y: lat3s, 
-                                                  self.R_fake_t: fake_t, self.R_rec_t: rec_t})
+                                                  self.R_real_t: real_t, self.R_fake_t: fake_t, self.R_rec_t: rec_t})
                 
                 trnresult = self.sess.run([train_aux, cost_KLD, cost_rec1, cost_rec2, cost_rec3, cost_R_VAE, cost_R_aux, cost_Y_VAE, cost_Y_aux],
                                      feed_dict = {self.node: DV[start_:end_], self.edge: DE[start_:end_], self.property: DY[start_:end_],
                                                   self.latent_epsilon: lat1s, self.new_latent: lat2s, self.new_y: lat3s, 
-                                                  self.R_fake_t: fake_t, self.R_rec_t: rec_t})  
+                                                  self.R_real_t: real_t, self.R_fake_t: fake_t, self.R_rec_t: rec_t})  
                  
                 trnscores[i, :] = trnresult[1:]
             
@@ -201,10 +204,12 @@ class Model(object):
                 novel=novel_count/valid_count
                 
                 gmean = (valid * unique * novel) ** (1/3)
+                eval_log[epoch] = gmean
                 
                 print('--evaluation epoch id: ', epoch, 'Valid:',valid*100,' // Unique:',unique*100,' // Novel:',novel*100, '// Gmean:',gmean*100)            
           
-                if epoch == max_epoch - 1: self.saver.save(self.sess, save_path)              
+                if np.max(eval_log[:epoch+1]) == gmean:
+                    self.saver.save(self.sess, save_path)              
                             
 
     def test(self, n_gen, isconditional, smisuppl, atom_list, target_id=None, target_Y_norm=None):
