@@ -52,5 +52,6 @@ model = Model(n_node, dim_node, dim_edge, dim_y, mu_prior, cov_prior)
 
 print(':: train model')
 with model.sess:
+    load_path=None
     save_path=save_dict+data+'_model.ckpt'
-    model.train(DV, DE, DY, Dsmi, atom_list, save_path)
+    model.train(DV, DE, DY, Dsmi, atom_list, load_path, save_path)
