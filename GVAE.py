@@ -325,13 +325,14 @@ class Model(object):
         Chem.Kekulize(mol_n)
         output = Chem.MolToSmiles(mol_n, kekuleSmiles=True) 
         
-        # additional constraints     
-        rings = mol_n.GetRingInfo().AtomRings()
-        for ring in rings:
-            if len(ring) > 8:
-                raise
-
         if '.' in output: raise
+        
+        # additional constraints
+        if train==True:     
+            rings = mol_n.GetRingInfo().AtomRings()
+            for ring in rings:
+                if len(ring) > 8:
+                    raise
         
         return output 
     
