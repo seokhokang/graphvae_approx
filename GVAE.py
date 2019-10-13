@@ -125,10 +125,10 @@ class Model(object):
         cost_R_aux = cost_R_aux + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_fake_t, logits=self.R_fake))
         cost_R_aux = cost_R_aux + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_rec_t, logits=self.R_rec))
         
-        cost_Y_VAE = tf.reduce_mean(tf.reduce_mean(tf.squared_difference(self.property, self.y_rec) * self.R_rec_t, 1))
-        cost_Y_VAE = cost_Y_VAE + tf.reduce_mean(tf.reduce_mean(tf.squared_difference(self.new_y, self.y_fake) * self.R_fake_t, 1))
+        cost_Y_VAE = tf.reduce_mean(tf.reduce_sum(tf.squared_difference(self.property, self.y_rec) * self.R_rec_t, 1))
+        cost_Y_VAE = cost_Y_VAE + tf.reduce_mean(tf.reduce_sum(tf.squared_difference(self.new_y, self.y_fake) * self.R_fake_t, 1))
         
-        cost_Y_aux = tf.reduce_mean(tf.reduce_mean(tf.squared_difference(self.property, self.y_real), 1))
+        cost_Y_aux = tf.reduce_mean(tf.reduce_sum(tf.squared_difference(self.property, self.y_real), 1))
 
         beta1 = 1
         beta2 = 1
