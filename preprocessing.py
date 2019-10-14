@@ -7,6 +7,7 @@ import sys
 
 
 data = sys.argv[1]
+use_AROMATIC = False
 
 def to_onehot(val, cat):
 
@@ -29,30 +30,27 @@ def atomFeatures(a):
 
 def bondFeatures(bonds):
 
-    e1 = np.zeros(3)
+    e1 = np.zeros(dim_edge)
     if len(bonds)==1:
-        e1 = to_onehot(str(bonds[0].GetBondType()), ['SINGLE', 'DOUBLE', 'TRIPLE'])
+        e1 = to_onehot(str(bonds[0].GetBondType()), ['SINGLE', 'DOUBLE', 'TRIPLE', 'AROMATIC'])[:dim_edge]
 
     return np.array(e1)
 
 
 if data=='QM9':
-
     data_size=100000
     n_max=9
-    dim_node=2 + 3 + 4
-    dim_edge=3
-    
     atom_list=['C','N','O','F']
 
 elif data=='ZINC':
-
     data_size=100000
     n_max=38
-    dim_node=2 + 3 + 9
-    dim_edge=3
-    
     atom_list=['C','N','O','F','P','S','Cl','Br','I']
+
+dim_node = 5 + len(atom_list)
+dim_edge = 3
+if use_AROMATIC:
+    dim_edge = dim_edge + 1
     
 smisuppl = pkl.load(open('./'+data+'_smi.pkl','rb'))
 molsuppl = np.array([Chem.MolFromSmiles(smi) for smi in smisuppl])
@@ -64,7 +62,7 @@ Dsmi = []
 for i, mol in enumerate(molsuppl):
 
     mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol,isomericSmiles=False))  
-    Chem.Kekulize(mol)
+    if use_AROMATIC == False: Chem.Kekulize(mol)
     n_atom = mol.GetNumHeavyAtoms()
         
     # node DV
@@ -89,7 +87,9 @@ for i, mol in enumerate(molsuppl):
     DV.append(node)
     DE.append(edge)
     DY.append(property)
-    Dsmi.append(Chem.MolToSmiles(mol))
+    
+    if use_AROMATIC: Dsmi.append(Chem.MolToSmiles(mol))
+    else: Dsmi.append(Chem.MolToSmiles(mol, kekuleSmiles=True))
 
     if i % 1000 == 0:
         print(i, flush=True)

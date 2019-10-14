@@ -8,24 +8,10 @@ import sys
 data = sys.argv[1]
 
 if data=='QM9':
-
-    data_size=100000
-    n_max=9
-    dim_node=2 + 3 + 4
-    dim_edge=3
-    
     atom_list=['C','N','O','F']
-
-elif data=='ZINC':
-
-    data_size=100000
-    n_max=38
-    dim_node=2 + 3 + 9
-    dim_edge=3
     
+elif data=='ZINC':
     atom_list=['C','N','O','F','P','S','Cl','Br','I']
-
-n_node = n_max
 
 data_path = './'+data+'_graph.pkl'
 save_dict = './'
@@ -38,6 +24,9 @@ DV = DV.todense()
 DE = DE.todense()
 DY = DY
 
+n_node = DV.shape[1]
+dim_node = DV.shape[2]
+dim_edge = DE.shape[3]
 dim_y = DY.shape[1]
 
 print(':: preprocess data')

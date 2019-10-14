@@ -294,7 +294,8 @@ class Model(object):
             return out
         
         ref_atom = atom_list
-        ref_bond = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.TRIPLE]
+        ref_bond = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.TRIPLE, Chem.BondType.AROMATIC]
+        ref_bond = ref_bond[:self.dim_edge]
     
         node_charge = to_val(np.argmax(to_dummy(dv[:,:2], 1), 1), [-1, 1])
         node_exp = to_val(np.argmax(to_dummy(dv[:,2:2+3], 1), 1), [1, 2, 3])    
@@ -330,17 +331,21 @@ class Model(object):
         Chem.SanitizeMol(mol_rec)
             
         mol_n = Chem.MolFromSmiles(Chem.MolToSmiles(mol_rec))
-        Chem.Kekulize(mol_n)
-        output = Chem.MolToSmiles(mol_n, kekuleSmiles=True) 
+        if self.dim_edge == 3:
+            Chem.Kekulize(mol_n)
+            output = Chem.MolToSmiles(mol_n, kekuleSmiles=True) 
+        elif self.dim_edge == 4:
+            output = Chem.MolToSmiles(mol_n) 
+        else:
+            raise
         
         if '.' in output: raise
         
-        # additional constraints
-        if train==True:     
-            rings = mol_n.GetRingInfo().AtomRings()
-            for ring in rings:
-                if len(ring) > 8:
-                    raise
+        # additional constraints 
+        rings = mol_n.GetRingInfo().AtomRings()
+        for ring in rings:
+            if len(ring) > 8:
+                raise
         
         return output 
     
