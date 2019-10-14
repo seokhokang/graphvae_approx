@@ -57,13 +57,13 @@ class Model(object):
         self.edge_pad = tf.pad(self.edge, tf.constant([[0,0],[0,self.n_dummy],[0,self.n_dummy],[0,0]]), 'CONSTANT')
 
         # auxiliary
-        self.R_rec = self._encoder(self.batch_size, self.rec_node, self.rec_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 1, name='auxiliary/R', reuse=False)
-        self.R_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 1, name='auxiliary/R', reuse=True)
-        self.R_real = self._encoder(self.batch_size, self.node_pad, self.edge_pad, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 1, name='auxiliary/R', reuse=True)
+        self.R_rec = self._encoder(self.batch_size, self.rec_node, self.rec_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 2, name='auxiliary/R', reuse=False)
+        self.R_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 2, name='auxiliary/R', reuse=True)
+        self.R_real = self._encoder(self.batch_size, self.node_pad, self.edge_pad, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, 2, name='auxiliary/R', reuse=True)
         
-        self.R_rec_t = tf.placeholder(tf.float32, [self.batch_size, 1])
-        self.R_fake_t = tf.placeholder(tf.float32, [self.batch_size, 1])
-        self.R_real_t = tf.placeholder(tf.float32, [self.batch_size, 1])
+        self.R_rec_t = tf.placeholder(tf.float32, [self.batch_size, 2])
+        self.R_fake_t = tf.placeholder(tf.float32, [self.batch_size, 2])
+        self.R_real_t = tf.placeholder(tf.float32, [self.batch_size, 2])
         
         self.y_rec = self._encoder(self.batch_size, self.rec_node, self.rec_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, name='auxiliary/Y', reuse=False)
         self.y_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, name='auxiliary/Y', reuse=True)
@@ -82,11 +82,19 @@ class Model(object):
 
         def _reward(nodes, edges):
         
-            R_t = np.zeros((self.batch_size, 1))
+            def _preference(smi):
+                val = 0
+                # mol = Chem.MolFromSmiles(smi)
+                # set val = 1 if mol is preferred 
+                
+                return val
+        
+            R_t = np.zeros((self.batch_size, 2))
             for j in range(self.batch_size):
                 try:         
                     R_smi = self._vec_to_mol(nodes[j], edges[j], atom_list, train=True)
                     R_t[j, 0] = 1
+                    R_t[j, 1] = _preference(R_smi)
                 except:
                     pass
             
@@ -118,15 +126,15 @@ class Model(object):
         cost_rec3 = cost_rec3 + tf.reduce_mean(tf.reduce_sum(tf.squared_difference(e, er), [1, 2]))
         cost_rec3 = cost_rec3 + tf.reduce_mean(tf.reduce_sum(tf.squared_difference(f, fr), [1, 2]))
  
-        cost_R_VAE = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_rec), logits=self.R_rec))
-        cost_R_VAE = cost_R_VAE + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_fake), logits=self.R_fake))
+        cost_R_VAE = tf.reduce_mean(tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_rec), logits=self.R_rec), 1))
+        cost_R_VAE = cost_R_VAE + tf.reduce_mean(tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_fake), logits=self.R_fake), 1))
         
-        cost_R_aux = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_real_t, logits=self.R_real))
-        cost_R_aux = cost_R_aux + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_fake_t, logits=self.R_fake))
-        cost_R_aux = cost_R_aux + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_rec_t, logits=self.R_rec))
+        cost_R_aux = tf.reduce_mean(tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_real_t, logits=self.R_real), 1))
+        cost_R_aux = cost_R_aux + tf.reduce_mean(tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_fake_t, logits=self.R_fake), 1))
+        cost_R_aux = cost_R_aux + tf.reduce_mean(tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.R_rec_t, logits=self.R_rec), 1))
         
-        cost_Y_VAE = tf.reduce_mean(tf.reduce_sum(tf.squared_difference(self.property, self.y_rec) * self.R_rec_t, 1))
-        cost_Y_VAE = cost_Y_VAE + tf.reduce_mean(tf.reduce_sum(tf.squared_difference(self.new_y, self.y_fake) * self.R_fake_t, 1))
+        cost_Y_VAE = tf.reduce_mean(tf.reduce_sum(tf.squared_difference(self.property, self.y_rec) * self.R_rec_t[:,0:1], 1))
+        cost_Y_VAE = cost_Y_VAE + tf.reduce_mean(tf.reduce_sum(tf.squared_difference(self.new_y, self.y_fake) * self.R_fake_t[:,0:1], 1))
         
         cost_Y_aux = tf.reduce_mean(tf.reduce_sum(tf.squared_difference(self.property, self.y_real), 1))
 
