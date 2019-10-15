@@ -55,6 +55,7 @@ with model.sess:
     list_Y=[]
     for m in genmols:
         mol = Chem.MolFromSmiles(m)
+        if dim_edge == 3: Chem.Kekulize(mol)
         list_Y.append([Descriptors.ExactMolWt(mol), Descriptors.MolLogP(mol)])
 
     print(':: unconditional generation results', len(genmols), np.mean(list_Y,0), np.std(list_Y,0))
@@ -76,6 +77,7 @@ with model.sess:
             list_Y=[]
             for i, m in enumerate(genmols):
                 mol = Chem.MolFromSmiles(m)
+                if dim_edge == 3: Chem.Kekulize(mol)
                 list_Y.append([Descriptors.ExactMolWt(mol), Descriptors.MolLogP(mol)])
             
             print(':: conditional generation results', target_id, target_Y, len(genmols), np.mean(list_Y,0), np.std(list_Y,0))
