@@ -6,9 +6,7 @@ from rdkit.Chem import Descriptors
 
 class Model(object):
 
-    def __init__(self, n_node, dim_node, dim_edge, dim_y, mu_prior, cov_prior, dim_h=50, dim_z=100, dim_f=500, n_mpnn_step=3, n_dummy=5, batch_size=20, lr=0.0005, useGPU=True):
-
-        use_PREFERENCE = False
+    def __init__(self, n_node, dim_node, dim_edge, dim_y, mu_prior, cov_prior, dim_h=50, dim_z=100, dim_f=500, n_mpnn_step=3, n_dummy=5, batch_size=20, lr=0.0005, useGPU=True, use_PREFERENCE=False):
         
         warnings.filterwarnings('ignore')
         tf.logging.set_verbosity(tf.logging.ERROR)
