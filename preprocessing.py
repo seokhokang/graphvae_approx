@@ -3,7 +3,6 @@ import pickle as pkl
 import sys, sparse
 from rdkit import Chem
 from rdkit.Chem import AllChem, Descriptors
-import sys
 
 
 data = sys.argv[1]
@@ -65,13 +64,13 @@ for i, smi in enumerate(smisuppl):
     n_atom = mol.GetNumHeavyAtoms()
         
     # node DV
-    node = np.zeros((n_max, dim_node), dtype=int)
+    node = np.zeros((n_max, dim_node), dtype=np.int8)
     for j in range(n_atom):
         atom = mol.GetAtomWithIdx(j)
         node[j, :]=atomFeatures(atom)
     
     # edge DE
-    edge = np.zeros((n_max, n_max, dim_edge), dtype=int)
+    edge = np.zeros((n_max, n_max, dim_edge), dtype=np.int8)
     for j in range(n_atom - 1):
         for k in range(j + 1, n_atom):
             molpath = Chem.GetShortestPath(mol, j, k)
@@ -96,8 +95,8 @@ for i, smi in enumerate(smisuppl):
     if len(DV) == data_size: break
 
 # np array    
-DV = np.asarray(DV, dtype=int)
-DE = np.asarray(DE, dtype=int)
+DV = np.asarray(DV, dtype=np.int8)
+DE = np.asarray(DE, dtype=np.int8)
 DY = np.asarray(DY)
 Dsmi = np.asarray(Dsmi)
 
