@@ -53,15 +53,14 @@ if use_AROMATIC:
     dim_edge = dim_edge + 1
     
 smisuppl = pkl.load(open('./'+data+'_smi.pkl','rb'))
-molsuppl = np.array([Chem.MolFromSmiles(smi) for smi in smisuppl])
 
 DV = []
 DE = [] 
 DY = []
 Dsmi = []
-for i, mol in enumerate(molsuppl):
+for i, smi in enumerate(smisuppl):
 
-    mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol,isomericSmiles=False))  
+    mol = Chem.MolFromSmiles(Chem.MolToSmiles(Chem.MolFromSmiles(smi),isomericSmiles=False))  
     if use_AROMATIC == False: Chem.Kekulize(mol)
     n_atom = mol.GetNumHeavyAtoms()
         
