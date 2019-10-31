@@ -345,10 +345,10 @@ class Model(object):
         if '.' in output: raise
         
         # additional constraints 
-        rings = mol_n.GetRingInfo().AtomRings()
-        for ring in rings:
-            if len(ring) > 8:
-                raise
+        # rings = mol_n.GetRingInfo().AtomRings()
+        #for ring in rings:
+        #    if len(ring) > 8:
+        #        raise
         
         return output 
     
