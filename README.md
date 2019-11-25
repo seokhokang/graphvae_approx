@@ -24,6 +24,6 @@ Tensorflow implementation of the model described in the paper [Efficient Learnin
   volume={11},
   pages={70},
   year={2019},
-  doi="10.1186/s13321-019-0396-x"
+  doi={10.1186/s13321-019-0396-x}
 }
 ```
