@@ -366,22 +366,19 @@ class Model(object):
 
         def _embed_node(inp):
         
-            inp = tf.reshape(inp, [batch_size * n_node, int(inp.shape[2])])
             inp = tf.layers.dense(inp, hiddendim, activation = tf.nn.tanh)
-        
-            inp = tf.reshape(inp, [batch_size, n_node, hiddendim])
+
             inp = inp * mask
         
             return inp
 
         def _edge_nn(inp):
-        
-            inp = tf.reshape(inp, [batch_size * n_node * n_node, int(inp.shape[3])])
+
             inp = tf.layers.dense(inp, hiddendim * hiddendim)
         
-            inp = tf.reshape(inp, [batch_size, n_node, n_node, hiddendim, hiddendim])
-            inp = inp * tf.reshape(1-tf.eye(n_node), [1, n_node, n_node, 1, 1])
-            inp = inp * tf.reshape(mask, [batch_size, n_node, 1, 1, 1]) * tf.reshape(mask, [batch_size, 1, n_node, 1, 1])
+            inp = tf.reshape(inp, [batch_size, self.n_node, self.n_node, hiddendim, hiddendim])
+            inp = inp * tf.reshape(1-tf.eye(self.n_node), [1, self.n_node, self.n_node, 1, 1])
+            inp = inp * tf.reshape(mask, [batch_size, self.n_node, 1, 1, 1]) * tf.reshape(mask, [batch_size, 1, self.n_node, 1, 1])
 
             return inp
 
@@ -389,11 +386,11 @@ class Model(object):
         
             def _msg_nn(wgt, node):
             
-                wgt = tf.reshape(wgt, [batch_size * n_node, n_node * hiddendim, hiddendim])
-                node = tf.reshape(node, [batch_size * n_node, hiddendim, 1])
+                wgt = tf.reshape(wgt, [batch_size * self.n_node, self.n_node * hiddendim, hiddendim])
+                node = tf.reshape(node, [batch_size * self.n_node, hiddendim, 1])
             
                 msg = tf.matmul(wgt, node)
-                msg = tf.reshape(msg, [batch_size, n_node, n_node, hiddendim])
+                msg = tf.reshape(msg, [batch_size, self.n_node, self.n_node, hiddendim])
                 msg = tf.transpose(msg, perm = [0, 2, 3, 1])
                 msg = tf.reduce_mean(msg, 3)
             
@@ -403,13 +400,13 @@ class Model(object):
             
                 with tf.variable_scope('mpnn_gru', reuse=reuse_GRU):
             
-                    msg = tf.reshape(msg, [batch_size * n_node, 1, hiddendim])
-                    node = tf.reshape(node, [batch_size * n_node, hiddendim])
+                    msg = tf.reshape(msg, [batch_size * self.n_node, 1, hiddendim])
+                    node = tf.reshape(node, [batch_size * self.n_node, hiddendim])
             
                     cell = tf.nn.rnn_cell.GRUCell(hiddendim)
                     _, node_next = tf.nn.dynamic_rnn(cell, msg, initial_state = node)
             
-                    node_next = tf.reshape(node_next, [batch_size, n_node, hiddendim]) * mask
+                    node_next = tf.reshape(node_next, [batch_size, self.n_node, hiddendim]) * mask
             
                 return node_next
 
@@ -426,21 +423,15 @@ class Model(object):
         def _readout(hidden_0, hidden_n, outdim):    
             
             def _attn_nn(inp, hdim):
-            
-                inp = tf.reshape(inp, [batch_size * n_node, int(inp.shape[2])])
+
                 inp = tf.layers.dense(inp, hdim, activation = tf.nn.sigmoid)
-                
-                inp = tf.reshape(inp, [batch_size, n_node, hdim])
-                 
+
                 return inp
         
             def _tanh_nn(inp, hdim):
-            
-                inp = tf.reshape(inp, [batch_size * n_node, int(inp.shape[2])])
+
                 inp = tf.layers.dense(inp, hdim)
-            
-                inp = tf.reshape(inp, [batch_size, n_node, hdim])
-                
+
                 return inp
 
             attn_wgt = _attn_nn(tf.concat([hidden_0, hidden_n], 2), aggrdim) 
@@ -456,8 +447,7 @@ class Model(object):
             return pred
 
         with tf.variable_scope(name, reuse=reuse):
-        
-            n_node = int(node.shape[1])
+
             mask = tf.reduce_max(node[:,:,2+3:], 2, keepdims=True)
             
             edge_wgt = _edge_nn(edge)
