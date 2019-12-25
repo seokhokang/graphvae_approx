@@ -109,25 +109,13 @@ class Model(object):
         cost_rec1 = tf.reduce_mean(tf.reduce_sum(tf.squared_difference(tf.reduce_sum(self.node, 1), tf.reduce_sum(self.rec_node, 1)), 1))
         cost_rec1 = cost_rec1 + tf.reduce_mean(tf.reduce_sum(tf.squared_difference(tf.reduce_sum(self.edge, [1, 2]), tf.reduce_sum(self.rec_edge, [1, 2])), 1) )
 
-        a=tf.matmul(self.edge[:,:,:,0], self.node)
-        b=tf.matmul(self.edge[:,:,:,1], self.node)
-        c=tf.matmul(self.edge[:,:,:,2], self.node)
-        ar=tf.matmul(self.rec_edge[:,:,:,0], self.rec_node)
-        br=tf.matmul(self.rec_edge[:,:,:,1], self.rec_node)
-        cr=tf.matmul(self.rec_edge[:,:,:,2], self.rec_node)
-        cost_rec2 = tf.reduce_mean(tf.reduce_sum(tf.squared_difference(tf.reduce_sum(a, 1), tf.reduce_sum(ar, 1)), 1))
-        cost_rec2 = cost_rec2 + tf.reduce_mean(tf.reduce_sum(tf.squared_difference(tf.reduce_sum(b, 1), tf.reduce_sum(br, 1)), 1))
-        cost_rec2 = cost_rec2 + tf.reduce_mean(tf.reduce_sum(tf.squared_difference(tf.reduce_sum(c, 1), tf.reduce_sum(cr, 1)), 1))
+        a = [tf.matmul(self.edge[:,:,:,i], self.node) for i in range(self.dim_edge)]
+        ar = [tf.matmul(self.rec_edge[:,:,:,i], self.rec_node) for i in range(self.dim_edge)]
+        cost_rec2 = tf.reduce_sum([tf.reduce_mean(tf.reduce_sum(tf.squared_difference(tf.reduce_sum(a[i], 1), tf.reduce_sum(ar[i], 1)), 1)) for i in range(self.dim_edge)])
         
-        d=tf.matmul(tf.transpose(self.node, perm=[0,2,1]), a)
-        e=tf.matmul(tf.transpose(self.node, perm=[0,2,1]), b)
-        f=tf.matmul(tf.transpose(self.node, perm=[0,2,1]), c)
-        dr=tf.matmul(tf.transpose(self.rec_node, perm=[0,2,1]), ar)
-        er=tf.matmul(tf.transpose(self.rec_node, perm=[0,2,1]), br)
-        fr=tf.matmul(tf.transpose(self.rec_node, perm=[0,2,1]), cr)
-        cost_rec3 = tf.reduce_mean(tf.reduce_sum(tf.squared_difference(d, dr), [1, 2]))
-        cost_rec3 = cost_rec3 + tf.reduce_mean(tf.reduce_sum(tf.squared_difference(e, er), [1, 2]))
-        cost_rec3 = cost_rec3 + tf.reduce_mean(tf.reduce_sum(tf.squared_difference(f, fr), [1, 2]))
+        b = [tf.matmul(tf.transpose(self.node, perm=[0,2,1]), a[i]) for i in range(self.dim_edge)]
+        br = [tf.matmul(tf.transpose(self.rec_node, perm=[0,2,1]), ar[i]) for i in range(self.dim_edge)]
+        cost_rec3 = tf.reduce_sum([tf.reduce_mean(tf.reduce_sum(tf.squared_difference(b[i], br[i]), [1, 2])) for i in range(self.dim_edge)])
  
         cost_R_VAE = tf.reduce_mean(tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_rec), logits=self.R_rec), 1))
         cost_R_VAE = cost_R_VAE + tf.reduce_mean(tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(self.R_fake), logits=self.R_fake), 1))
