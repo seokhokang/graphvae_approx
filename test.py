@@ -17,9 +17,6 @@ elif data=='ZINC':
     atom_list=['C','N','O','F','P','S','Cl','Br','I']
     target_list=[[300,350,400],[1.5,2.5,3.5]]
 
-elif data=='CHEMBL':
-    atom_list=['B','C','N','O','F','Si','P','S','Cl','Se','Br','I']
-    
 data_path = './'+data+'_graph.pkl'
 save_path = './'+data+'_model.ckpt'
 
@@ -37,12 +34,10 @@ scaler = StandardScaler()
 scaler.fit(DY)
 DY = scaler.transform(DY)
 
-dim_atom = len(atom_list)
-edge_clip = np.max(DE, (0,1,2))[3:]
 mu_prior=np.mean(DY,0)   
 cov_prior=np.cov(DY.T)             
 
-model = Model(n_node, dim_node, dim_edge, dim_y, dim_atom, edge_clip, mu_prior, cov_prior)
+model = Model(n_node, dim_node, dim_edge, dim_y, mu_prior, cov_prior)
 np.set_printoptions(precision=3, suppress=True)
 
 with model.sess:
