@@ -60,6 +60,7 @@ Dsmi = []
 for i, smi in enumerate(smisuppl):
 
     mol = Chem.MolFromSmiles(Chem.MolToSmiles(Chem.MolFromSmiles(smi),isomericSmiles=False))  
+    mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol))
     if use_AROMATIC == False: Chem.Kekulize(mol)
     n_atom = mol.GetNumHeavyAtoms()
         
@@ -85,8 +86,7 @@ for i, smi in enumerate(smisuppl):
     DV.append(node)
     DE.append(edge)
     DY.append(property)
-    
-    mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol))
+
     if use_AROMATIC: Dsmi.append(Chem.MolToSmiles(mol))
     else: Dsmi.append(Chem.MolToSmiles(mol, kekuleSmiles=True))
 
