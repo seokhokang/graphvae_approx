@@ -86,6 +86,7 @@ for i, smi in enumerate(smisuppl):
     DE.append(edge)
     DY.append(property)
     
+    mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol))
     if use_AROMATIC: Dsmi.append(Chem.MolToSmiles(mol))
     else: Dsmi.append(Chem.MolToSmiles(mol, kekuleSmiles=True))
 
