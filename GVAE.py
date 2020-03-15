@@ -483,7 +483,7 @@ class Model(object):
         with tf.variable_scope(name, reuse=reuse):
         
             for _ in range(n_step):
-                latent = tf.nn.leaky_relu(tf.layers.batch_normalization(tf.layers.dense(latent, self.dim_f)))
+                latent = tf.layers.dense(latent, self.dim_f, activation = tf.nn.leaky_relu)
             
             rec_node_prob = _decoder_node(latent)
             rec_edge_prob = _decoder_edge(latent)
