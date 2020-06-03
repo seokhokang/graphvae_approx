@@ -40,7 +40,7 @@ class Model(object):
         self.edge = tf.placeholder(tf.float32, [self.batch_size, self.n_node, self.n_node, self.dim_edge])
         self.property = tf.placeholder(tf.float32, [self.batch_size, self.dim_y])
 
-        self.latent = self._encoder(self.batch_size, self.node, self.edge, self.property, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_z * 2, name='encoder', reuse=False)    
+        self.latent = self._encoder(self.batch_size, self.node, self.edge, self.property, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_z * 2, 0, name='encoder', reuse=False)    
         self.latent_mu, self.latent_lsgms = tf.split(self.latent, [self.dim_z, self.dim_z], 1)
         
         self.latent_epsilon = tf.random_normal([self.batch_size, self.dim_z], 0., 1.)
@@ -60,17 +60,17 @@ class Model(object):
         self.edge_pad = tf.pad(self.edge, tf.constant([[0,0],[0,self.n_dummy],[0,self.n_dummy],[0,0]]), 'CONSTANT')
 
         # auxiliary
-        self.R_rec = self._encoder(self.batch_size, self.rec_node, self.rec_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_R, name='auxiliary/R', reuse=False)
-        self.R_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_R, name='auxiliary/R', reuse=True)
-        self.R_real = self._encoder(self.batch_size, self.node_pad, self.edge_pad, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_R, name='auxiliary/R', reuse=True)
+        self.R_rec = self._encoder(self.batch_size, self.rec_node, self.rec_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_R, 0, name='auxiliary/R', reuse=False)
+        self.R_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_R, 0, name='auxiliary/R', reuse=True)
+        self.R_real = self._encoder(self.batch_size, self.node_pad, self.edge_pad, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_R, 0, name='auxiliary/R', reuse=True)
         
         self.R_rec_t = tf.placeholder(tf.float32, [self.batch_size, self.dim_R])
         self.R_fake_t = tf.placeholder(tf.float32, [self.batch_size, self.dim_R])
         self.R_real_t = tf.placeholder(tf.float32, [self.batch_size, self.dim_R])
         
-        self.y_rec = self._encoder(self.batch_size, self.rec_node, self.rec_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, name='auxiliary/Y', reuse=False)
-        self.y_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, name='auxiliary/Y', reuse=True)
-        self.y_real = self._encoder(self.batch_size, self.node_pad, self.edge_pad, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, name='auxiliary/Y', reuse=True)
+        self.y_rec = self._encoder(self.batch_size, self.rec_node, self.rec_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, 0, name='auxiliary/Y', reuse=False)
+        self.y_fake = self._encoder(self.batch_size, self.new_node, self.new_edge, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, 0, name='auxiliary/Y', reuse=True)
+        self.y_real = self._encoder(self.batch_size, self.node_pad, self.edge_pad, None, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_y, 0, name='auxiliary/Y', reuse=True)
 
         # session
         self.saver = tf.train.Saver()
@@ -155,7 +155,7 @@ class Model(object):
             self.saver.restore(self.sess, load_path)
 
         ## tranining
-        max_epoch=100
+        max_epoch = 50
         print('::: training')
         trn_log = np.zeros((max_epoch, 8))
         eval_log = np.zeros(max_epoch)
@@ -350,7 +350,7 @@ class Model(object):
         return set
         
     
-    def _encoder(self, batch_size, node, edge, prop, n_step, hiddendim, aggrdim, latentdim, name='', reuse=True):
+    def _encoder(self, batch_size, node, edge, prop, n_step, hiddendim, aggrdim, latentdim, drate, name='', reuse=True):
 
         def _embed_node(inp):
         
@@ -428,7 +428,9 @@ class Model(object):
             
             if prop is not None: readout = tf.concat([readout, prop], 1)
             
+            readout = tf.layers.dropout(readout, drate, training = True)
             readout = tf.nn.tanh(tf.layers.dense(readout, aggrdim))
+            readout = tf.layers.dropout(readout, drate, training = True)
             readout = tf.nn.tanh(tf.layers.dense(readout, aggrdim))
             pred = tf.layers.dense(readout, outdim) 
     
