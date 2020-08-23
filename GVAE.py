@@ -274,22 +274,21 @@ class Model(object):
     
     def _vec_to_mol(self, dv, de, atom_list, train=True):
     
-        def to_dummy(vec, ax=1, thr=1):  return np.concatenate([vec, thr - np.sum(vec, ax, keepdims=True)], ax)
+        def to_dummy(vec, ax=1, thr=1):
 
-        def to_val(vec, cat):  
-            out = np.zeros(np.shape(vec))
-            for i, v in enumerate(vec):
-                for j, c in enumerate(cat): 
-                    if v == j: out[i]=c
-                    
-            return out
+            return np.concatenate([vec, thr - np.sum(vec, ax, keepdims=True)], ax)
+
+        def cat_to_val(vec, cat):
+
+            cat.append(0) 
+            return np.array(cat)[vec]
         
         ref_atom = atom_list
         ref_bond = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.TRIPLE, Chem.BondType.AROMATIC]
         ref_bond = ref_bond[:self.dim_edge]
     
-        node_charge = to_val(np.argmax(to_dummy(dv[:,:2], 1), 1), [-1, 1])
-        node_exp = to_val(np.argmax(to_dummy(dv[:,2:2+3], 1), 1), [1, 2, 3])    
+        node_charge = cat_to_val(np.argmax(to_dummy(dv[:,:2], 1), 1), [-1, 1])
+        node_exp = cat_to_val(np.argmax(to_dummy(dv[:,2:2+3], 1), 1), [1, 2, 3])    
     
         node_atom = np.argmax(to_dummy(dv[:,2+3:], 1), 1)
         edge_bond = np.argmax(to_dummy(de, 2), 2)
