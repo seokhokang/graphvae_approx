@@ -27,11 +27,9 @@ def atomFeatures(a):
     
     return np.concatenate([v1, v2, v3], axis=0)
 
-def bondFeatures(bonds):
+def bondFeatures(bond):
 
-    e1 = np.zeros(dim_edge)
-    if len(bonds)==1:
-        e1 = to_onehot(str(bonds[0].GetBondType()), ['SINGLE', 'DOUBLE', 'TRIPLE', 'AROMATIC'])[:dim_edge]
+    e1 = to_onehot(str(bond.GetBondType()), ['SINGLE', 'DOUBLE', 'TRIPLE', 'AROMATIC'])[:dim_edge]
 
     return np.array(e1)
 
@@ -65,19 +63,19 @@ for i, smi in enumerate(smisuppl):
     n_atom = mol.GetNumHeavyAtoms()
         
     # node DV
-    node = np.zeros((n_max, dim_node), dtype=np.int8)
+    node = np.zeros((n_max, dim_node), dtype=bool)
     for j in range(n_atom):
         atom = mol.GetAtomWithIdx(j)
         node[j, :]=atomFeatures(atom)
     
     # edge DE
-    edge = np.zeros((n_max, n_max, dim_edge), dtype=np.int8)
+    edge = np.zeros((n_max, n_max, dim_edge), dtype=bool)
     for j in range(n_atom - 1):
         for k in range(j + 1, n_atom):
-            molpath = Chem.GetShortestPath(mol, j, k)
-            bonds = [mol.GetBondBetweenAtoms(molpath[bid], molpath[bid + 1]) for bid in range(len(molpath) - 1)]
-            edge[j, k, :] = bondFeatures(bonds)
-            edge[k, j, :] = edge[j, k, :]
+            bond = mol.GetBondBetweenAtoms(j, k)
+            if bond is not None:
+                edge[j, k, :] = bondFeatures(bond)
+                edge[k, j, :] = edge[j, k, :]
 
     # property DY
     property = [Descriptors.ExactMolWt(mol), Descriptors.MolLogP(mol)]
@@ -96,8 +94,8 @@ for i, smi in enumerate(smisuppl):
     if len(DV) == data_size: break
 
 # np array    
-DV = np.asarray(DV, dtype=np.int8)
-DE = np.asarray(DE, dtype=np.int8)
+DV = np.asarray(DV, dtype=bool)
+DE = np.asarray(DE, dtype=bool)
 DY = np.asarray(DY)
 Dsmi = np.asarray(Dsmi)
 
