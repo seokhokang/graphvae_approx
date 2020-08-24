@@ -5,16 +5,20 @@ from GVAE import Model
 import sys
 
 
+
+
 data = sys.argv[1]
 
 if data=='QM9':
     atom_list=['C','N','O','F']
     
+    
 elif data=='ZINC':
     atom_list=['C','N','O','F','P','S','Cl','Br','I']
 
+    
 data_path = './'+data+'_graph.pkl'
-save_dict = './'
+save_path = './'+data+'_model.ckpt'
 
 print(':: load data')
 with open(data_path,'rb') as f:
@@ -22,7 +26,6 @@ with open(data_path,'rb') as f:
 
 DV = DV.todense()
 DE = DE.todense()
-DY = DY
 
 n_node = DV.shape[1]
 dim_node = DV.shape[2]
@@ -42,5 +45,4 @@ model = Model(n_node, dim_node, dim_edge, dim_y, mu_prior, cov_prior)
 print(':: train model')
 with model.sess:
     load_path=None
-    save_path=save_dict+data+'_model.ckpt'
     model.train(DV, DE, DY, Dsmi, atom_list, load_path, save_path)
